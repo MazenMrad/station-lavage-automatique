@@ -1,0 +1,140 @@
+<!DOCTYPE html>
+<html lang="fr"><head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Station de lavage automatique – modèle 3D</title>
+<style>
+:root{--bg:#e9eef4;--panel:rgba(255,255,255,.92);--text:#18212d;--muted:#566174;--line:#c3cddb;--chip:#f2f5f9;color-scheme:light;box-sizing:border-box;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}
+@media (prefers-color-scheme:dark){:root:not([data-theme="light"]){--bg:#10161f;--panel:rgba(22,30,42,.92);--text:#e8edf4;--muted:#9aa7ba;--line:#2c3a4e;--chip:#1c2636;color-scheme:dark}}
+:root[data-theme="dark"]{--bg:#10161f;--panel:rgba(22,30,42,.92);--text:#e8edf4;--muted:#9aa7ba;--line:#2c3a4e;--chip:#1c2636;color-scheme:dark}
+html{scroll-padding-top:env(safe-area-inset-top,0px)}
+html,body{height:100%;margin:0}
+body{background:var(--bg);color:var(--text);font:14px/1.4 system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;position:relative;overflow:hidden}
+#c{position:absolute;inset:0}
+canvas{display:block;touch-action:none}
+.p{position:absolute;left:10px;background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:10px 12px;width:min(350px,calc(100% - 20px));box-sizing:border-box}
+#ctl{top:10px}#st{bottom:10px}
+h1{font-size:15px;margin:0 0 2px}
+.h{color:var(--muted);font-size:12px;margin-bottom:8px}
+.row{display:flex;flex-wrap:wrap;gap:6px}
+button{font:inherit;font-weight:600;padding:8px 14px;border-radius:8px;border:1px solid var(--line);background:var(--chip);color:var(--text);cursor:pointer}
+button:focus-visible{outline:2px solid #3b82f6;outline-offset:2px}
+.g{background:#1f9d55;border-color:#1f9d55;color:#fff}.r{background:#d64545;border-color:#d64545;color:#fff}
+#stp{font-weight:600}
+.bar{height:6px;background:var(--chip);border-radius:3px;margin:6px 0 8px;overflow:hidden}
+.bar i{display:block;height:100%;width:0;background:#3b82f6}
+.k{color:var(--muted);font-size:12px;margin:6px 0 3px}
+.chips{display:flex;flex-wrap:wrap;gap:4px}
+.chip{font-size:12px;padding:2px 8px 2px 6px;border-radius:99px;border:1px solid var(--line);background:var(--chip);display:flex;align-items:center;gap:5px}
+.chip::before{content:"";width:8px;height:8px;border-radius:50%;background:#c0392b}
+.chip.on::before{background:#2ecc71}
+#msg{margin-top:8px;color:var(--muted);font-size:12px;min-height:17px}
+</style></head><body>
+<div id="c"></div>
+<div class="p" id="ctl"><h1>Station de lavage automatique</h1>
+<div class="h">Glisse pour tourner, molette ou pincement pour zoomer.</div>
+<div class="row"><button id="bs" class="g">START</button><button id="bt" class="r">STOP</button><button id="bn">Nouvelle voiture</button><button id="bv">Vitesse ×1</button></div></div>
+<div class="p" id="st"><div id="stp"></div><div class="bar"><i id="pb"></i></div>
+<div class="k">Capteurs</div><div class="chips" id="ci"></div>
+<div class="k">Sorties</div><div class="chips" id="co"></div><div id="msg"></div></div>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+<script>
+(function(){
+if(typeof THREE==="undefined"){document.body.insertAdjacentHTML("beforeend","<p style='padding:20px'>Impossible de charger la 3D.</p>");return}
+const $=id=>document.getElementById(id),dark=matchMedia("(prefers-color-scheme: dark)").matches;
+const scene=new THREE.Scene();scene.background=new THREE.Color(dark?0x10161f:0xe9eef4);
+const cam=new THREE.PerspectiveCamera(45,1,.1,300),ren=new THREE.WebGLRenderer({antialias:true});
+ren.setPixelRatio(Math.min(devicePixelRatio,2));$("c").appendChild(ren.domElement);
+scene.add(new THREE.HemisphereLight(0xffffff,0x778899,.95));
+const dl=new THREE.DirectionalLight(0xffffff,.7);dl.position.set(8,14,10);scene.add(dl);
+const M=(c,o)=>new THREE.MeshStandardMaterial(Object.assign({color:c,roughness:.6,metalness:.15},o||{}));
+const bx=(w,h,d,m,x,y,z,p)=>{const o=new THREE.Mesh(new THREE.BoxGeometry(w,h,d),m);o.position.set(x,y,z);(p||scene).add(o);return o};
+const cy=(r,h,m,x,y,z,seg)=>{const o=new THREE.Mesh(new THREE.CylinderGeometry(r,r,h,seg||20),m);o.position.set(x,y,z);scene.add(o);return o};
+function lab(t,x,y,z,s){const c=document.createElement("canvas");c.width=512;c.height=96;const q=c.getContext("2d");q.fillStyle="rgba(255,255,255,.93)";q.beginPath();if(q.roundRect)q.roundRect(4,8,504,80,18);else q.rect(4,8,504,80);q.fill();q.fillStyle="#18212d";q.font="bold 40px system-ui,sans-serif";q.textAlign="center";q.textBaseline="middle";q.fillText(t,256,50);
+const sp=new THREE.Sprite(new THREE.SpriteMaterial({map:new THREE.CanvasTexture(c),depthTest:false}));sp.position.set(x,y,z);sp.scale.set(s||3.6,(s||3.6)*.1875,1);sp.renderOrder=5;scene.add(sp)}
+/* sol et convoyeur */
+bx(44,.2,12,M(dark?0x1a2431:0xd3dbe6),0,-.1,0);
+bx(21.5,.5,2.4,M(0x3b4656),.25,.25,0);
+[1.2,-1.2].forEach(z=>bx(21.5,.12,.12,M(0x8896a8),.25,.52,z));
+const tc=document.createElement("canvas");tc.width=64;tc.height=16;const g=tc.getContext("2d");g.fillStyle="#2c3440";g.fillRect(0,0,64,16);g.fillStyle="#4a5666";g.fillRect(0,0,6,16);
+const tex=new THREE.CanvasTexture(tc);tex.wrapS=tex.wrapT=THREE.RepeatWrapping;tex.repeat.set(26,1);
+const belt=new THREE.Mesh(new THREE.PlaneGeometry(21,2.1),new THREE.MeshStandardMaterial({map:tex,roughness:.8}));belt.rotation.x=-Math.PI/2;belt.position.set(.25,.51,0);scene.add(belt);
+[-10.3,10.8].forEach(x=>{const r=cy(.28,2.3,M(0x9aa6b6),x,.4,0);r.rotation.x=Math.PI/2});
+const mm=M(0x17a2b8,{emissive:0x000000});bx(1,.7,.8,mm,-11.4,.4,0);const sh=cy(.12,.7,M(0x888f99),-10.8,.4,0);sh.rotation.z=Math.PI/2;
+lab("Q0.0 · Moteur convoyeur",-11.4,1.6,0);
+/* capteurs */
+const SX=[-8.5,-5,-1.2,2.6,6,9.3],SN=["I0.2 · Présence","I0.3 · Soapy","I0.4 · Brusher","I0.5 · Clean water","I0.6 · Dryer","I0.7 · Sortie"];
+const pm=M(0x5d6b7e);
+const sm=SX.map((x,i)=>{bx(.12,.9,.12,pm,x,.95,1.55);bx(.12,.9,.12,pm,x,.95,-1.55);const m=M(0xd62828,{emissive:0x5a0a0a});bx(.34,.3,.34,m,x,1.5,1.55);bx(.34,.3,.34,pm,x,1.5,-1.55);bx(.04,.04,3.1,m,x,1.5,0);lab(SN[i],x,2.25,1.9,3.1);return m});
+const setS=(m,on)=>{m.color.set(on?0x2ecc71:0xd62828);m.emissive.set(on?0x15a34a:0x5a0a0a)};
+/* postes */
+function gantry(x,col){const m=M(col);bx(.22,2.6,.22,m,x,1.8,1.35);bx(.22,2.6,.22,m,x,1.8,-1.35);bx(.3,.3,2.95,m,x,3.1,0)}
+function spray(cx,zs,y0,col,n,sp,vy){const g=new THREE.BufferGeometry(),pos=new Float32Array(n*3),v=[];
+for(let i=0;i<n;i++){const l=(y0-.55)/vy;v.push({z:zs[i%zs.length],dx:(Math.random()-.5)*sp,dz:(Math.random()-.5)*sp,l,t:Math.random()*l})}
+g.setAttribute("position",new THREE.BufferAttribute(pos,3));const o=new THREE.Points(g,new THREE.PointsMaterial({color:col,size:.09}));o.visible=false;o.frustumCulled=false;scene.add(o);return{o,pos,v,cx,y0}}
+function upd(s,dt,on){s.o.visible=on;if(!on)return;s.v.forEach((q,i)=>{q.t+=dt;if(q.t>q.l)q.t-=q.l;const k=q.t/q.l;s.pos[i*3]=s.cx+q.dx*k;s.pos[i*3+1]=s.y0-(s.y0-.55)*k;s.pos[i*3+2]=q.z+q.dz*k});s.o.geometry.attributes.position.needsUpdate=true}
+const nz=M(0xdddddd);
+gantry(SX[1],0x7d8da3);[.45,-.45].forEach(z=>cy(.08,.3,nz,SX[1],2.85,z));lab("Q0.1 · Eau savonneuse",SX[1],3.85,0);
+const s1=spray(SX[1],[.45,-.45],2.7,0xf5b8e8,110,1,2.2);
+gantry(SX[2],0x19b5d9);lab("Q0.2 · Brosse",SX[2],3.85,0);
+const bm=M(0x2e9e6b,{flatShading:true}),bs=[.85,-.85].map(z=>cy(.26,1.3,bm,SX[2],1.2,z,10));
+const tb=new THREE.Mesh(new THREE.CylinderGeometry(.24,.24,1.4,10).rotateX(Math.PI/2),bm);tb.position.set(SX[2],2.0,0);scene.add(tb);bx(.1,.7,.1,M(0x19b5d9),SX[2],2.6,0);
+gantry(SX[3],0x7d8da3);[.45,-.45].forEach(z=>cy(.08,.3,nz,SX[3],2.85,z));lab("Q0.3 · Eau propre",SX[3],3.85,0);
+const s3=spray(SX[3],[.45,-.45],2.7,0x4db8ff,110,1,2.2);
+gantry(SX[4],0x5b6678);lab("Q0.4 · Séchoir",SX[4],3.85,0);cy(.7,.3,M(0x39445a),SX[4],2.8,0,24);
+const fan=new THREE.Group();fan.position.set(SX[4],2.5,0);scene.add(fan);
+for(let k=0;k<4;k++){const pv=new THREE.Group();pv.rotation.y=k*Math.PI/2;fan.add(pv);bx(.58,.03,.18,M(0x222c3a),.32,0,0,pv)}
+const sd=spray(SX[4],[0],2.4,0xffffff,90,1.8,3.2);
+/* voiture */
+const car=new THREE.Group();car.position.y=.5;scene.add(car);const cm=M(0xff6b6b,{roughness:.4});
+bx(2.4,.5,1.2,cm,0,.5,0,car);bx(1.2,.45,1.05,cm,-.1,.97,0,car);bx(1,.3,1.08,M(0xbfe3ff,{roughness:.2}),-.1,.99,0,car);
+[.4,-.4].forEach(z=>bx(.05,.12,.25,M(0xfff3b0,{emissive:0xffe27a}),1.2,.55,z,car));
+const wh=[];[[.75,.62],[.75,-.62],[-.75,.62],[-.75,-.62]].forEach(([x,z])=>{const w=new THREE.Mesh(new THREE.CylinderGeometry(.24,.24,.2,16).rotateX(Math.PI/2),M(0x14181f));w.position.set(x,.24,z);car.add(w);wh.push(w)});
+/* automate */
+const SPD=1.6,IN=[["I0.2","Présence"],["I0.3","Soapy"],["I0.4","Brusher"],["I0.5","Clean water"],["I0.6","Dryer"],["I0.7","Sortie"]],OUT=[["Q0.0","Convoyeur"],["Q0.1","Eau savonneuse"],["Q0.2","Brosse"],["Q0.3","Eau propre"],["Q0.4","Séchoir"]];
+const LB=["Attente","Déplacement vers Soapy","Lavage à l’eau savonneuse","Déplacement vers Brusher","Brossage","Déplacement vers Clean Water","Rinçage à l’eau propre","Déplacement vers Dryer","Séchage","Déplacement vers la sortie"];
+let step=0,paused=false,hasCar=true,carX=SX[0],T=[0,0,0,0],simK=1,Q=[0,0,0,0,0],ins=[1,0,0,0,0,0],sp={b:0,f:0};
+const mk=(id,a)=>a.map(([s,n])=>{const e=document.createElement("span");e.className="chip";e.textContent=s+" "+n;$(id).appendChild(e);return e}),ci=mk("ci",IN),co=mk("co",OUT);
+const on=i=>hasCar&&Math.abs(carX-SX[i])<.15;
+function msg(t){$("msg").textContent=t}
+function plc(dt){
+if(!paused&&step>0){if(step%2){if(on((step+1)/2))step=step===9?0:step+1}else if(T[step/2-1]>=10){T[step/2-1]=0;step++}}
+const mv=step%2===1&&!paused,op=step>0&&step%2===0&&!paused;
+if(op)T[step/2-1]+=dt;
+Q=[mv,op&&step===2,op&&step===4,op&&step===6,op&&step===8];
+if(mv)carX=Math.min(carX+SPD*dt,SX[(step+1)/2]);
+ins=SX.map((_,i)=>on(i));
+const rem=step>0&&step%2===0?Math.max(0,10-T[step/2-1]):0;
+$("stp").textContent=(paused?"PAUSE · ":"")+"S"+step+" · "+LB[step]+(step%2===0&&step>0?" · "+rem.toFixed(1).replace(".",",")+" s":"");
+$("pb").style.width=(step>0&&step%2===0?T[step/2-1]*10:0)+"%";
+ci.forEach((e,i)=>e.classList.toggle("on",!!ins[i]));co.forEach((e,i)=>e.classList.toggle("on",!!Q[i]))}
+function anim(dt){
+if(Q[0]){tex.offset.x-=SPD/(21/26)*dt;wh.forEach(w=>w.rotation.z-=SPD/.24*dt)}
+car.position.x=carX;car.visible=hasCar;
+const k=1-Math.exp(-4*dt);sp.b+=((Q[2]?6:0)-sp.b)*k;sp.f+=((Q[4]?18:0)-sp.f)*k;
+bs.forEach(b=>b.rotation.y+=sp.b*dt);tb.rotation.z+=sp.b*dt;fan.rotation.y+=sp.f*dt;
+upd(s1,dt,Q[1]);upd(s3,dt,Q[3]);upd(sd,dt,Q[4]);
+sm.forEach((m,i)=>setS(m,ins[i]));mm.emissive.set(Q[0]?0x0a6b7a:0x000000)}
+/* boutons */
+$("bs").onclick=()=>{if(paused){paused=false;msg("Reprise à l’étape S"+step+", temps conservé.")}else if(step===0){if(hasCar&&Math.abs(carX-SX[0])<.15){step=1;msg("Cycle démarré.")}else msg("Départ refusé : aucune voiture au capteur de présence.")}};
+$("bt").onclick=()=>{if(step>0&&!paused){paused=true;msg("Pause : étape et temps écoulé conservés.")}};
+$("bn").onclick=()=>{if(step!==0){msg("Attends la fin du cycle avant d’ajouter une voiture.");return}hasCar=true;carX=SX[0];T.fill(0);msg("Nouvelle voiture au capteur de présence.")};
+$("bv").onclick=()=>{simK=simK===1?3:simK===3?10:1;$("bv").textContent="Vitesse ×"+simK};
+msg("Appuie sur START pour lancer le cycle.");
+/* caméra */
+let az=.3,el=.38,dist=26;const tgt=new THREE.Vector3(0,1.2,0);
+function rs(){const w=innerWidth,h=innerHeight;ren.setSize(w,h);cam.aspect=w/h;cam.updateProjectionMatrix();dist=Math.max(20,32/cam.aspect)}
+addEventListener("resize",rs);rs();
+const cv=ren.domElement,P=new Map();
+cv.addEventListener("pointerdown",e=>{cv.setPointerCapture(e.pointerId);P.set(e.pointerId,e)});
+cv.addEventListener("pointermove",e=>{const o=P.get(e.pointerId);if(!o)return;
+if(P.size===1){az-=(e.clientX-o.clientX)*.006;el=Math.max(.08,Math.min(1.45,el+(e.clientY-o.clientY)*.005))}
+else if(P.size===2){const[a,b]=[...P.values()],d0=Math.hypot(a.clientX-b.clientX,a.clientY-b.clientY);P.set(e.pointerId,e);const[c,d]=[...P.values()],d1=Math.hypot(c.clientX-d.clientX,c.clientY-d.clientY);if(d1>0)dist=Math.max(8,Math.min(80,dist*d0/d1))}
+P.set(e.pointerId,e)});
+["pointerup","pointercancel"].forEach(t=>cv.addEventListener(t,e=>P.delete(e.pointerId)));
+cv.addEventListener("wheel",e=>{e.preventDefault();dist=Math.max(8,Math.min(80,dist*(1+e.deltaY*.001)))},{passive:false});
+let last=performance.now();
+function loop(now){requestAnimationFrame(loop);const dt=Math.min((now-last)/1000,.05)*simK;last=now;plc(dt);anim(dt);
+cam.position.set(tgt.x+dist*Math.cos(el)*Math.sin(az),tgt.y+dist*Math.sin(el),tgt.z+dist*Math.cos(el)*Math.cos(az));cam.lookAt(tgt);ren.render(scene,cam)}
+requestAnimationFrame(loop);
+})();
+</script></body></html>
